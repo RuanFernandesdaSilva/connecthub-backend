@@ -1,0 +1,26 @@
+package com.auth.simpleauth.dto;
+
+public class AtualizarSenhaDto {
+
+    private String senhaAtual;
+    private String novaSenha;
+
+    public AtualizarSenhaDto() {
+    }
+
+    public String getSenhaAtual() {
+        return senhaAtual;
+    }
+
+    public void setSenhaAtual(String senhaAtual) {
+        this.senhaAtual = senhaAtual;
+    }
+
+    public String getNovaSenha() {
+        return novaSenha;
+    }
+
+    public void setNovaSenha(String novaSenha) {
+        this.novaSenha = novaSenha;
+    }
+}
