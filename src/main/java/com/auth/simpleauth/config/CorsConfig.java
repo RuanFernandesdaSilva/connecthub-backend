@@ -10,15 +10,21 @@ public class CorsConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOriginPatterns(
-                        "http://127.0.0.1:[*]",
-                        "http://localhost:[*]",
-                        "https://*.ngrok-free.app",
+                // Registre explicitamente as origens exatas do frontend
+                .allowedOrigins(
                         "https://connecthub-frontend-three.vercel.app",
-                        "https://*.vercel.app"
+                        "http://127.0.0.1:5500",
+                        "http://localhost:5500",
+                        "http://localhost:3000"
+                )
+                .allowedOriginPatterns(
+                        "https://*.vercel.app",
+                        "https://*.ngrok-free.app"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
-                .allowCredentials(true); // Permite o envio dos cookies de sessão (JSESSIONID)
+                .exposedHeaders("Set-Cookie", "Authorization")
+                .allowCredentials(true)
+                .maxAge(3600); // Salva o preflight CORS por 1 hora no navegador
     }
 }

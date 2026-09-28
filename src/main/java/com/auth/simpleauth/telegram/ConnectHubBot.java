@@ -282,10 +282,12 @@ public class ConnectHubBot extends TelegramLongPollingBot {
         btnProximaTela.setText("🚀 ABRA O APLICATIVO AQUI");
 
         // 💡 VALIDAÇÃO E DIRECIONAMENTO POR PERFIL:
+        // ✅ CORREÇÃO: Usa o frontendUrl vindo das configurações
         String paginaDestino = "IDOSO".equalsIgnoreCase(userTipo) ? "home-idoso.html" : "home-familiar.html";
-        String urlProximaTela = String.format("http://localhost:5500/%s?id=%d&tipo=%s", paginaDestino, userId, userTipo);
+        String urlProximaTela = String.format("%s/%s?id=%d&tipo=%s", frontendUrl, paginaDestino, userId, userTipo);
 
         btnProximaTela.setUrl(urlProximaTela);
+
 
         row.add(btnProximaTela);
         rows.add(row);
