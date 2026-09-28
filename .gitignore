@@ -32,5 +32,3 @@ build/
 ### VS Code ###
 .vscode/
 
-# Ignora arquivo de propriedades de produção com senhas/tokens reais
-src/main/resources/application-prod.properties
