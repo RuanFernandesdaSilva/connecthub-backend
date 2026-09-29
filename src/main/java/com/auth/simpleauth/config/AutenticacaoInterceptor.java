@@ -17,13 +17,17 @@ public class AutenticacaoInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 2. Libera a rota do QR Code para não exigir cookie de sessão no navegador
         String uri = request.getRequestURI();
-        if (uri.startsWith("/api/qrcode")) {
+        String method = request.getMethod();
+
+        // 2. Libera rotas públicas de autenticação, cadastro e QR Code
+        if (uri.startsWith("/api/qrcode") ||
+                uri.startsWith("/login") ||
+                (uri.startsWith("/usuarios") && "POST".equalsIgnoreCase(method))) {
             return true;
         }
 
-        // 3. Validação normal de sessão para as demais rotas da aplicação
+        // 3. Validação normal de sessão para as rotas protegidas
         HttpSession session = request.getSession(false);
 
         if (session != null && session.getAttribute("usuario") != null) {
