@@ -16,7 +16,7 @@ public class EventoDeepLinkPollingService {
     @Value("${telegram.bot.evento.token}")
     private String botToken;
 
-    @Value("${app.frontend.url}")
+    @Value("${app.frontend.url:https://connecthub-frontend-three.vercel.app}")
     private String frontendUrl;
 
     @Value("${telegram.bot.hub.username:ConnectHubSpoke_bot}")

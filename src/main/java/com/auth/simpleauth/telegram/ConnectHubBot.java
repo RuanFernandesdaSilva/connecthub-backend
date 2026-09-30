@@ -33,7 +33,7 @@ public class ConnectHubBot extends TelegramLongPollingBot {
     @Value("${telegram.bot.hub.username:ConnectHubCentralBot}")
     private String botUsername;
 
-    @Value("${app.frontend.url:https://seusistema.com}")
+    @Value("${app.frontend.url:https://connecthub-frontend-three.vercel.app}")
     private String frontendUrl;
 
     private final DoseRepository doseRepository;
