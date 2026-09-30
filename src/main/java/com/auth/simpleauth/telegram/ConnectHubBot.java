@@ -259,9 +259,8 @@ public class ConnectHubBot extends TelegramLongPollingBot {
         message.setParseMode("HTML");
 
         StringBuilder mensagemTexto = new StringBuilder();
-        boolean isIdoso = "IDOSO".equalsIgnoreCase(userTipo);
 
-        if (isIdoso) {
+        if ("IDOSO".equalsIgnoreCase(userTipo)) {
             mensagemTexto.append(String.format("🎉 <b>PARABÉNS, %s!</b> 🎉\n\n", nomeUsuario));
             mensagemTexto.append("✅ <b>Tudo pronto!</b>\n");
             mensagemTexto.append("Agora você vai receber todos os seus avisos por aqui!\n\n");
@@ -275,13 +274,6 @@ public class ConnectHubBot extends TelegramLongPollingBot {
 
         message.setText(mensagemTexto.toString());
 
-        // Sanitização da URL base para evitar barras duplas
-        String baseUrl = frontendUrl != null ? frontendUrl.trim().replaceAll("/+$", "") : "";
-        String paginaDestino = isIdoso ? "home-idoso.html" : "home-familiar.html";
-
-        // URL formatada garantindo a passagem do ID e TIPO do usuário
-        String urlProximaTela = String.format("%s/%s?id=%d&tipo=%s", baseUrl, paginaDestino, userId, userTipo);
-
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
@@ -289,8 +281,13 @@ public class ConnectHubBot extends TelegramLongPollingBot {
         InlineKeyboardButton btnProximaTela = new InlineKeyboardButton();
         btnProximaTela.setText("🚀 ABRA O APLICATIVO AQUI");
 
-        // FIX 1: Usa WebAppInfo para abrir DENTRO da janela interna do Telegram
-        btnProximaTela.setWebApp(new WebAppInfo(urlProximaTela));
+        // Sanitiza a URL base para remover barras extras no final
+        String baseUrl = frontendUrl != null ? frontendUrl.trim().replaceAll("/+$", "") : "";
+        String paginaDestino = "IDOSO".equalsIgnoreCase(userTipo) ? "home-idoso.html" : "home-familiar.html";
+        String urlProximaTela = String.format("%s/%s?id=%d&tipo=%s", baseUrl, paginaDestino, userId, userTipo);
+
+        // Mantém setUrl para abrir diretamente no navegador padrão do celular
+        btnProximaTela.setUrl(urlProximaTela);
 
         row.add(btnProximaTela);
         rows.add(row);
