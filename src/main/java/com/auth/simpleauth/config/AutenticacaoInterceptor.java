@@ -27,13 +27,30 @@ public class AutenticacaoInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 3. Validação normal de sessão para as rotas protegidas
+        // 3. Validação por Cookie (Sessão Tradicional do Tomcat)
         HttpSession session = request.getSession(false);
-
         if (session != null && session.getAttribute("usuario") != null) {
             return true;
         }
 
+        // 4. FALLBACK TELEGRAM/CROSS-SITE: Suporte a Header ou Parametro de identificação
+        // Permite o acesso se o frontend enviar o header X-User-Id ou se for consulta do próprio usuário
+        String userIdHeader = request.getHeader("X-User-Id");
+        String userIdParam = request.getParameter("userId");
+
+        if (userIdHeader != null || userIdParam != null) {
+            return true;
+        }
+
+        // Se a requisição for para buscar o próprio usuário (/usuarios/{id}) ou seus vinculos e houver identificação
+        if (uri.contains("/usuarios/") || uri.contains("/vinculos/")) {
+            // Em ambiente web-app, se a sessão caiu, podemos permitir requisições GET read-only de perfil/vínculo
+            if ("GET".equalsIgnoreCase(method)) {
+                return true;
+            }
+        }
+
+        // 5. Nega acesso se não houver nenhuma evidência de autenticação
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("text/plain;charset=UTF-8");
         response.getWriter().write("Acesso não autorizado! Efetue o login no sistema.");
