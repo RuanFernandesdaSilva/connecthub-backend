@@ -39,7 +39,6 @@ public class MedicamentoSchedulerService {
     public void verificarDosesAgendadas() {
         LocalDateTime agora = LocalDateTime.now(clock);
 
-        // Incluído StatusDose.ATRASADO para manter o agendador escutando todas as doses pendentes de ação
         List<Dose> dosesParaProcessar = doseRepository.findByStatusInAndHorarioProgramadoLessThanEqual(
                 List.of(StatusDose.PENDENTE, StatusDose.NOTIFICADO, StatusDose.ATRASADO),
                 agora
@@ -102,7 +101,7 @@ public class MedicamentoSchedulerService {
         if (dose.getStatus() == StatusDose.PENDENTE) {
             dose.setStatus(StatusDose.NOTIFICADO);
             dose.setQuantidadeNotificacoes(1);
-            dose.setProximaNotificacao(agora.plusMinutes(2)); // Próximo aviso em +2 minutos
+            dose.setProximaNotificacao(agora.plusMinutes(2));
             doseRepository.save(dose);
 
             String mensagemAcessivel = MensagemUtil.montarMensagemAcessivel(dose);
@@ -117,25 +116,33 @@ public class MedicamentoSchedulerService {
                 dose.setQuantidadeNotificacoes(tentativas);
 
                 if (tentativas == 2) {
-                    // Reaviso ao idoso e agendamento para +1 minuto (totalizando 3 minutos)
                     dose.setProximaNotificacao(agora.plusMinutes(1));
                     doseRepository.save(dose);
 
-                    String emojiCor = MensagemUtil.obterEmojiCor(med.getCorCaixa());
-                    String msgReiteracao = String.format(
-                            "⚠️ %s, você ainda não confirmou o remédio da caixa %s <b>%s</b> ('<b>%s</b>')!\n" +
-                                    "Por favor, clique no botão abaixo para confirmar.",
-                            nomeIdoso,
-                            emojiCor,
-                            med.getCorCaixa() != null ? med.getCorCaixa().toUpperCase() : "",
-                            nomeMedicamento
-                    );
+                    String msgReiteracao;
+                    if (med.getCorCaixa() != null && !med.getCorCaixa().isBlank()) {
+                        String emojiCor = MensagemUtil.obterEmojiCor(med.getCorCaixa());
+                        msgReiteracao = String.format(
+                                "⚠️ %s, você ainda não confirmou o remédio da caixa %s %s ('%s')!\n" +
+                                        "Por favor, clique no botão abaixo para confirmar.",
+                                nomeIdoso,
+                                emojiCor,
+                                med.getCorCaixa().toUpperCase(),
+                                nomeMedicamento
+                        );
+                    } else {
+                        msgReiteracao = String.format(
+                                "⚠️ %s, você ainda não confirmou o remédio '%s'!\n" +
+                                        "Por favor, clique no botão abaixo para confirmar.",
+                                nomeIdoso,
+                                nomeMedicamento
+                        );
+                    }
                     medTelegramNotifier.enviarNotificacaoComBotao(telegramIdIdoso, msgReiteracao, dose.getId());
 
                 } else {
-                    // Limite atingido (3 min): Altera para ATRASADO e alerta o familiar
                     dose.setStatus(StatusDose.ATRASADO);
-                    dose.setProximaNotificacao(null); // Finaliza reavisos automáticos ao idoso
+                    dose.setProximaNotificacao(null);
                     doseRepository.save(dose);
 
                     notificarFamiliarAtraso(dose);
@@ -173,9 +180,7 @@ public class MedicamentoSchedulerService {
         Familiar familiar = dose.getMedicamento().getIdoso() != null ? dose.getMedicamento().getIdoso().getFamiliar() : null;
         if (familiar != null && familiar.getTelegramChatId() != null && !familiar.getTelegramChatId().isBlank()) {
             String msgFamiliar = String.format(
-                    "🚨 <b>ATENÇÃO: ALERTA DE ATRASO</b>\n\n" +
-                            "O idoso <b>%s</b> NÃO confirmou a dose do medicamento '<b>%s</b>' programada para as <b>%s</b>!\n\n" +
-                            "Por favor, entre em contato para verificar.",
+                    "🚨 ATENÇÃO: O idoso %s NÃO confirmou a dose do medicamento '%s' programada para as %s!",
                     dose.getMedicamento().getIdoso().getNome(),
                     dose.getMedicamento().getNome(),
                     dose.getHorarioProgramado().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))

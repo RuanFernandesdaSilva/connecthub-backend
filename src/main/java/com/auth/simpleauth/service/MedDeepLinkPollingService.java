@@ -128,7 +128,8 @@ public class MedDeepLinkPollingService {
 
         String baseUrl = frontendUrl != null ? frontendUrl.trim().replaceAll("/+$", "") : "";
 
-        String urlRetorno = String.format("%s/webapp/medicamento-bot.html?token=%s&ativado=true&hubUsername=%s",
+        // ROTA WEBAPP RESTAURADA: medicamentos.html
+        String urlRetorno = String.format("%s/webapp/medicamentos.html?token=%s&ativado=true&hubUsername=%s",
                 baseUrl, token, botHubUsername);
 
         String texto = String.format(
@@ -163,17 +164,17 @@ public class MedDeepLinkPollingService {
             if (dose.getStatus() != StatusDose.TOMADO) {
                 doseService.confirmarDose(idDose);
 
-                // 1. Notifica o Idoso que a dose foi confirmada
+                // 1. Notifica o Idoso mantendo a mensagem exata do histórico do print
                 String chatIdIdoso = dose.getMedicamento().getIdoso().getTelegramChatId();
                 if (chatIdIdoso != null && !chatIdIdoso.isBlank()) {
-                    medTelegramNotifier.enviarNotificacao(chatIdIdoso, "👏 <b>Muito bem!</b> Você já tomou seu remédio.");
+                    medTelegramNotifier.enviarNotificacao(chatIdIdoso, "🎉 Parabéns! Sua dose foi confirmada com sucesso.");
                 }
 
-                // 2. Notifica o Familiar de forma segura contra NullPointerException/Blank
+                // 2. Notifica o Familiar de forma segura contra NPE/Blank mantendo a mensagem exata do histórico
                 var familiar = dose.getMedicamento().getIdoso() != null ? dose.getMedicamento().getIdoso().getFamiliar() : null;
                 if (familiar != null && familiar.getTelegramChatId() != null && !familiar.getTelegramChatId().isBlank()) {
                     String msgFamiliar = String.format(
-                            "✅ O idoso <b>%s</b> confirmou a tomada do medicamento '<b>%s</b>'!",
+                            "✅ O idoso %s confirmou a tomada do medicamento '%s'!",
                             dose.getMedicamento().getIdoso().getNome(),
                             dose.getMedicamento().getNome()
                     );
