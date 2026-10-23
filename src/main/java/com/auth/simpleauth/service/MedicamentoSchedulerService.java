@@ -50,6 +50,7 @@ public class MedicamentoSchedulerService {
     }
 
     @Scheduled(fixedRate = 10000)
+    @Transactional
     public void verificarTratamentosExpirados() {
         LocalDateTime agora = LocalDateTime.now(clock);
 
@@ -74,7 +75,7 @@ public class MedicamentoSchedulerService {
                 notificarFamiliarTerminoTratamento(med);
 
             } catch (Exception e) {
-                System.err.println("Erro ao processar inativação do medicamento ID " + med.getId() + ": " + e.getMessage());
+                System.err.println("❌ Erro ao processar inativação do medicamento ID " + med.getId() + ": " + e.getMessage());
             }
         }
     }
@@ -82,7 +83,7 @@ public class MedicamentoSchedulerService {
     private void processarDose(Dose dose, LocalDateTime agora) {
         Medicamento med = dose.getMedicamento();
 
-        if (Boolean.FALSE.equals(med.getAtivo())) {
+        if (med == null || Boolean.FALSE.equals(med.getAtivo())) {
             dose.setStatus(StatusDose.CANCELADO);
             doseRepository.save(dose);
             return;
@@ -94,8 +95,11 @@ public class MedicamentoSchedulerService {
         }
 
         String nomeMedicamento = med.getNome();
-        String nomeIdoso = med.getIdoso().getNome();
-        String telegramIdIdoso = med.getIdoso().getTelegramChatId();
+        var idoso = med.getIdoso();
+        if (idoso == null) return;
+
+        String nomeIdoso = idoso.getNome();
+        String telegramIdIdoso = idoso.getTelegramChatId();
 
         // 1ª NOTIFICAÇÃO (0 minutos)
         if (dose.getStatus() == StatusDose.PENDENTE) {
@@ -105,6 +109,7 @@ public class MedicamentoSchedulerService {
             doseRepository.save(dose);
 
             String mensagemAcessivel = MensagemUtil.montarMensagemAcessivel(dose);
+            System.out.println(">>> [1ª NOTIFICAÇÃO] Enviando lembrete para IDOSO: " + nomeIdoso + " | ChatID: " + telegramIdIdoso);
             medTelegramNotifier.enviarNotificacaoComBotao(telegramIdIdoso, mensagemAcessivel, dose.getId());
             return;
         }
@@ -138,6 +143,7 @@ public class MedicamentoSchedulerService {
                                 nomeMedicamento
                         );
                     }
+                    System.out.println(">>> [2ª NOTIFICAÇÃO] Reiterando aviso para IDOSO: " + nomeIdoso);
                     medTelegramNotifier.enviarNotificacaoComBotao(telegramIdIdoso, msgReiteracao, dose.getId());
 
                 } else {
@@ -145,6 +151,7 @@ public class MedicamentoSchedulerService {
                     dose.setProximaNotificacao(null);
                     doseRepository.save(dose);
 
+                    System.out.println(">>> [3 MINUTOS PASSARAM] Notificando familiar sobre o atraso da dose ID: " + dose.getId());
                     notificarFamiliarAtraso(dose);
                 }
             }
@@ -177,17 +184,22 @@ public class MedicamentoSchedulerService {
     }
 
     private void notificarFamiliarAtraso(Dose dose) {
-        Familiar familiar = dose.getMedicamento().getIdoso() != null ? dose.getMedicamento().getIdoso().getFamiliar() : null;
+        var idoso = dose.getMedicamento() != null ? dose.getMedicamento().getIdoso() : null;
+        Familiar familiar = idoso != null ? idoso.getFamiliar() : null;
+
         if (familiar != null && familiar.getTelegramChatId() != null && !familiar.getTelegramChatId().isBlank()) {
             String msgFamiliar = String.format(
-                    "🚨 ATENÇÃO: O idoso %s NÃO confirmou a dose do medicamento '%s' programada para as %s!",
-                    dose.getMedicamento().getIdoso().getNome(),
+                    "🚨 <b>ATENÇÃO FAMILIAR!</b> 🚨\n\n" +
+                            "O idoso <b>%s</b> NÃO confirmou a dose do medicamento <b>'%s'</b> programada para as %s!",
+                    idoso.getNome(),
                     dose.getMedicamento().getNome(),
                     dose.getHorarioProgramado().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))
             );
+            System.out.println(">>> [NOTIFICANDO FAMILIAR] Enviando mensagem de atraso para: " + familiar.getNome() + " | ChatID: " + familiar.getTelegramChatId());
             medTelegramNotifier.enviarNotificacao(familiar.getTelegramChatId(), msgFamiliar);
         } else {
-            System.err.println("⚠️ Não foi possível notificar o familiar: Chat ID ausente ou não vinculado para o idoso " + dose.getMedicamento().getIdoso().getNome());
+            System.err.println("⚠️ [ALERTA DE ATRASO FALHOU]: " +
+                    (idoso == null ? "Idoso nulo" : (familiar == null ? "Idoso '" + idoso.getNome() + "' não possui Familiar vinculado!" : "Familiar '" + familiar.getNome() + "' está com Telegram Chat ID NULO ou VAZIO no banco!")));
         }
     }
 }
