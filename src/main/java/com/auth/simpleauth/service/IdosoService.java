@@ -79,4 +79,8 @@ public class IdosoService {
         }
         idosoRepository.deleteById(id);
     }
+
+    public List<Familiar> listarFamiliares() {
+        return familiarRepository.findAll();
+    }
 }
