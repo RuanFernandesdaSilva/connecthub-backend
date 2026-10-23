@@ -52,9 +52,13 @@ public class WebAppActivationService {
             }
         }
 
-        if (chatId == null) return false;
+        // Se ainda não temos o chatId do familiar/idoso, não tenta disparar a API do Telegram aqui,
+        // pois o vinculo principal será gravado pelo Polling (MedDeepLinkPollingService) quando ele der o /start no Bot
+        if (chatId == null || chatId.isBlank()) {
+            System.out.println(">>> [WebAppActivationService] ChatId ainda nulo para " + tipo + " ID: " + id + ". Vínculo aguardando /start no Bot de Remédios.");
+            return true;
+        }
 
-        // Seleciona o Token do Bot Secundário correto
         String botTokenTarget = switch (servico.toUpperCase()) {
             case "MEDICAMENTOS" -> tokenBotMed;
             case "EVENTOS" -> tokenBotEvento;
@@ -64,7 +68,6 @@ public class WebAppActivationService {
 
         if (botTokenTarget == null || botTokenTarget.isBlank()) return false;
 
-        // Envia mensagem em segundo plano via API Bot do Telegram (Equivalente ao /start do bot secundário)
         String urlApiTelegram = String.format("https://api.telegram.org/bot%s/sendMessage", botTokenTarget);
         String mensagem = String.format("✅ Olá <b>%s</b>! O serviço de <b>%s</b> foi ativado com sucesso para a sua conta.", nome, servico);
 
@@ -78,7 +81,7 @@ public class WebAppActivationService {
             restTemplate.postForEntity(urlApiTelegram, body, String.class);
             return true;
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println(">>> Erro ao enviar mensagem no bot secundário: " + e.getMessage());
             return false;
         }
     }
