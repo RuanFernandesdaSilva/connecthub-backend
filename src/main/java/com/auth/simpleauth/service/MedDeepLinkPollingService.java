@@ -129,7 +129,7 @@ public class MedDeepLinkPollingService {
         String baseUrl = frontendUrl != null ? frontendUrl.trim().replaceAll("/+$", "") : "";
 
         // ROTA WEBAPP RESTAURADA: medicamentos.html
-        String urlRetorno = String.format("%s/webapp/medicamentos.html?token=%s&ativado=true&hubUsername=%s",
+        String urlRetorno = String.format("%s/webapp/medicamento-bot.html?token=%s&ativado=true&hubUsername=%s",
                 baseUrl, token, botHubUsername);
 
         String texto = String.format(
