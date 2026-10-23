@@ -7,6 +7,7 @@ import com.auth.simpleauth.repository.IdosoRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -46,6 +47,7 @@ public class MedDeepLinkPollingService {
     }
 
     @Scheduled(fixedRate = 3000)
+    @Transactional
     public void verificarAtualizacoesMed() {
         if (botToken == null || botToken.isBlank()) return;
 
@@ -85,6 +87,7 @@ public class MedDeepLinkPollingService {
         }
     }
 
+    @Transactional
     private void processarComandoStart(String texto, String chatId) {
         if (texto.startsWith("/start")) {
             String[] partes = texto.split(" ");
@@ -97,7 +100,7 @@ public class MedDeepLinkPollingService {
                                 idoso -> {
                                     idoso.setTelegramChatId(chatId);
                                     idosoRepository.save(idoso);
-
+                                    System.out.println(">>> [VÍNCULO TELEGRAM] Idoso '" + idoso.getNome() + "' (ID: " + idosoId + ") vinculado ao chatId: " + chatId);
                                     enviarConfirmacaoEVoltar(chatId, idoso.getNome(), token);
                                 },
                                 () -> medTelegramNotifier.enviarNotificacao(chatId, "⚠️ Não encontramos seu cadastro. Peça ajuda a um familiar.")
@@ -108,13 +111,14 @@ public class MedDeepLinkPollingService {
                                 familiar -> {
                                     familiar.setTelegramChatId(chatId);
                                     familiarRepository.save(familiar);
-
+                                    System.out.println(">>> [VÍNCULO TELEGRAM] Familiar '" + familiar.getNome() + "' (ID: " + familiarId + ") vinculado ao chatId: " + chatId);
                                     enviarConfirmacaoEVoltar(chatId, familiar.getNome(), token);
                                 },
                                 () -> medTelegramNotifier.enviarNotificacao(chatId, "⚠️ Cadastro não encontrado.")
                         );
                     }
                 } catch (Exception e) {
+                    System.err.println(">>> Erro ao processar /start: " + e.getMessage());
                     medTelegramNotifier.enviarNotificacao(chatId, "⚠️ Não conseguimos conectar. Tente pelo aplicativo novamente.");
                 }
             } else {
@@ -128,7 +132,6 @@ public class MedDeepLinkPollingService {
 
         String baseUrl = frontendUrl != null ? frontendUrl.trim().replaceAll("/+$", "") : "";
 
-        // ROTA WEBAPP RESTAURADA: medicamentos.html
         String urlRetorno = String.format("%s/webapp/medicamento-bot.html?token=%s&ativado=true&hubUsername=%s",
                 baseUrl, token, botHubUsername);
 
@@ -157,28 +160,40 @@ public class MedDeepLinkPollingService {
         }
     }
 
+    @Transactional
     private void processarConfirmacao(String callbackQueryId, Long idDose) {
         responderCallback(callbackQueryId, "✅ Remédio registrado com sucesso!");
 
         doseRepository.findById(idDose).ifPresent(dose -> {
+            System.out.println(">>> [CONFIRMAÇÃO DOSE] Processando Dose ID: " + idDose + " | Status atual: " + dose.getStatus());
+
             if (dose.getStatus() != StatusDose.TOMADO) {
                 doseService.confirmarDose(idDose);
 
-                // 1. Notifica o Idoso mantendo a mensagem exata do histórico do print
-                String chatIdIdoso = dose.getMedicamento().getIdoso().getTelegramChatId();
-                if (chatIdIdoso != null && !chatIdIdoso.isBlank()) {
-                    medTelegramNotifier.enviarNotificacao(chatIdIdoso, "🎉 Parabéns! Sua dose foi confirmada com sucesso.");
+                var medicamento = dose.getMedicamento();
+                var idoso = medicamento != null ? medicamento.getIdoso() : null;
+
+                // 1. Notifica o Idoso
+                if (idoso != null && idoso.getTelegramChatId() != null && !idoso.getTelegramChatId().isBlank()) {
+                    System.out.println(">>> Notificando IDOSO (" + idoso.getNome() + ") no Chat ID: " + idoso.getTelegramChatId());
+                    medTelegramNotifier.enviarNotificacao(idoso.getTelegramChatId(), "🎉 Parabéns! Sua dose foi confirmada com sucesso.");
+                } else {
+                    System.err.println(">>> ⚠️ AVISO: Idoso nulo ou sem Telegram Chat ID cadastrado!");
                 }
 
-                // 2. Notifica o Familiar de forma segura contra NPE/Blank mantendo a mensagem exata do histórico
-                var familiar = dose.getMedicamento().getIdoso() != null ? dose.getMedicamento().getIdoso().getFamiliar() : null;
+                // 2. Notifica o Familiar
+                var familiar = idoso != null ? idoso.getFamiliar() : null;
                 if (familiar != null && familiar.getTelegramChatId() != null && !familiar.getTelegramChatId().isBlank()) {
+                    System.out.println(">>> Notificando FAMILIAR (" + familiar.getNome() + ") no Chat ID: " + familiar.getTelegramChatId());
                     String msgFamiliar = String.format(
                             "✅ O idoso %s confirmou a tomada do medicamento '%s'!",
-                            dose.getMedicamento().getIdoso().getNome(),
-                            dose.getMedicamento().getNome()
+                            idoso.getNome(),
+                            medicamento.getNome()
                     );
                     medTelegramNotifier.enviarNotificacao(familiar.getTelegramChatId(), msgFamiliar);
+                } else {
+                    System.err.println(">>> ⚠️ AVISO AO FAMILIAR NÃO ENVIADO: " +
+                            (familiar == null ? "Idoso sem Familiar associado!" : "Familiar '" + familiar.getNome() + "' está com telegramChatId NULO ou VAZIO no banco de dados!"));
                 }
             }
         });
