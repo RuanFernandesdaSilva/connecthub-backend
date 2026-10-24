@@ -1,5 +1,6 @@
 package com.auth.simpleauth.service;
 
+import com.auth.simpleauth.entity.Familiar;
 import com.auth.simpleauth.enums.StatusDose;
 import com.auth.simpleauth.repository.DoseRepository;
 import com.auth.simpleauth.repository.FamiliarRepository;
@@ -174,7 +175,12 @@ public class MedDeepLinkPollingService {
 
                 var medicamento = dose.getMedicamento();
                 var idoso = medicamento != null ? medicamento.getIdoso() : null;
-                var familiar = idoso != null ? idoso.getFamiliar() : null;
+
+                // ✅ CORREÇÃO CRUCIAL: Busca o Familiar atualizado direto do banco de dados (ignorando cache)
+                Familiar familiar = null;
+                if (idoso != null && idoso.getFamiliar() != null) {
+                    familiar = familiarRepository.findById(idoso.getFamiliar().getId()).orElse(null);
+                }
 
                 String chatIdIdoso = idoso != null ? idoso.getTelegramChatId() : null;
                 String chatIdFamiliar = familiar != null ? familiar.getTelegramChatId() : null;
@@ -187,10 +193,10 @@ public class MedDeepLinkPollingService {
                     System.err.println(">>> ⚠️ AVISO: Idoso nulo ou sem Telegram Chat ID cadastrado!");
                 }
 
-                // 2. Notifica o Familiar (somente se o Chat ID do Familiar for válido e DIFERENTE do Idoso)
+                // 2. Notifica o Familiar
                 if (chatIdFamiliar != null && !chatIdFamiliar.isBlank()) {
                     if (chatIdFamiliar.equals(chatIdIdoso)) {
-                        System.err.println(">>> ⚠️ ALERTA: Chat ID do Familiar (" + chatIdFamiliar + ") é idêntico ao do Idoso! Notificação duplicada no mesmo aparelho evitada.");
+                        System.err.println(">>> ⚠️ ALERTA: Chat ID do Familiar (" + chatIdFamiliar + ") é idêntico ao do Idoso! Notificação duplicada evitada.");
                     } else {
                         System.out.println(">>> Notificando FAMILIAR (" + familiar.getNome() + ") no Chat ID: " + chatIdFamiliar);
                         String msgFamiliar = String.format(

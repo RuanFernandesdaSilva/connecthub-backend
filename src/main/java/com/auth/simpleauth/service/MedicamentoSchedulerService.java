@@ -6,6 +6,7 @@ import com.auth.simpleauth.entity.Familiar;
 import com.auth.simpleauth.entity.Medicamento;
 import com.auth.simpleauth.enums.StatusDose;
 import com.auth.simpleauth.repository.DoseRepository;
+import com.auth.simpleauth.repository.FamiliarRepository;
 import com.auth.simpleauth.repository.MedicamentoRepository;
 import com.auth.simpleauth.util.MensagemUtil;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,15 +24,18 @@ public class MedicamentoSchedulerService {
     private final MedicamentoRepository medicamentoRepository;
     private final MedTelegramNotifier medTelegramNotifier;
     private final TestableClock clock;
+    private final FamiliarRepository familiarRepository;
 
     public MedicamentoSchedulerService(DoseRepository doseRepository,
                                        MedicamentoRepository medicamentoRepository,
                                        MedTelegramNotifier medTelegramNotifier,
-                                       TestableClock clock) {
+                                       TestableClock clock,
+                                       FamiliarRepository familiarRepository) {
         this.doseRepository = doseRepository;
         this.medicamentoRepository = medicamentoRepository;
         this.medTelegramNotifier = medTelegramNotifier;
         this.clock = clock;
+        this.familiarRepository = familiarRepository;
     }
 
     @Scheduled(fixedRate = 3000)
@@ -185,7 +189,12 @@ public class MedicamentoSchedulerService {
 
     private void notificarFamiliarAtraso(Dose dose) {
         var idoso = dose.getMedicamento() != null ? dose.getMedicamento().getIdoso() : null;
-        Familiar familiar = idoso != null ? idoso.getFamiliar() : null;
+
+        // ✅ CORREÇÃO CRUCIAL: Busca o Familiar atualizado direto da tabela do banco sem usar o cache do Hibernate
+        Familiar familiar = null;
+        if (idoso != null && idoso.getFamiliar() != null) {
+            familiar = familiarRepository.findById(idoso.getFamiliar().getId()).orElse(null);
+        }
 
         if (familiar != null && familiar.getTelegramChatId() != null && !familiar.getTelegramChatId().isBlank()) {
             String msgFamiliar = String.format(
