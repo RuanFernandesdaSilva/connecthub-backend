@@ -26,16 +26,18 @@ public class IdosoService {
     public Idoso cadastrar(IdosoDto dto) {
         Familiar familiar = null;
 
-        // 1. Busca pelo idFamiliar vindo do DTO
+        // 1. Tenta buscar pelo idFamiliar enviado no DTO
         if (dto.getIdFamiliar() != null) {
-            familiar = familiarRepository.findById(dto.getIdFamiliar())
-                    .orElseThrow(() -> new RuntimeException("Familiar não encontrado com ID: " + dto.getIdFamiliar()));
-        } else {
-            // 2. Fallback defensivo: se não veio idFamiliar no DTO, vincula automaticamente ao primeiro familiar cadastrado
+            familiar = familiarRepository.findById(dto.getIdFamiliar()).orElse(null);
+        }
+
+        // 2. Fallback defensivo: se não foi informado ou não encontrou, associa ao primeiro familiar cadastrado
+        if (familiar == null) {
             List<Familiar> familiares = familiarRepository.findAll();
             if (!familiares.isEmpty()) {
                 familiar = familiares.get(0);
-                System.out.println(">>> ⚠️ [IdosoService] idFamiliar veio NULL no cadastro. Associando automaticamente ao Familiar: " + familiar.getNome() + " (ID: " + familiar.getId() + ")");
+                System.out.println(">>> ⚠️ [IdosoService] idFamiliar nulo ou não encontrado no DTO. Associando automaticamente ao Familiar: "
+                        + familiar.getNome() + " (ID: " + familiar.getId() + ")");
             }
         }
 
@@ -62,11 +64,16 @@ public class IdosoService {
         if (dto.getEmail() != null && !dto.getEmail().isBlank()) idosoEncontrado.setEmail(dto.getEmail());
         if (dto.getSenha() != null && !dto.getSenha().isBlank()) idosoEncontrado.setSenha(dto.getSenha());
 
-        // Se o DTO enviar idFamiliar, atualiza a relação
+        // Atualização Idempotente: só altera o vínculo se realmente for um familiar diferente
         if (dto.getIdFamiliar() != null) {
-            Familiar familiar = familiarRepository.findById(dto.getIdFamiliar())
-                    .orElseThrow(() -> new RuntimeException("Familiar não encontrado com ID: " + dto.getIdFamiliar()));
-            idosoEncontrado.setFamiliar(familiar);
+            boolean jaPossuiMesmoFamiliar = idosoEncontrado.getFamiliar() != null
+                    && idosoEncontrado.getFamiliar().getId().equals(dto.getIdFamiliar());
+
+            if (!jaPossuiMesmoFamiliar) {
+                Familiar novoFamiliar = familiarRepository.findById(dto.getIdFamiliar())
+                        .orElseThrow(() -> new RuntimeException("Familiar não encontrado com ID: " + dto.getIdFamiliar()));
+                idosoEncontrado.setFamiliar(novoFamiliar);
+            }
         }
 
         return idosoRepository.save(idosoEncontrado);
