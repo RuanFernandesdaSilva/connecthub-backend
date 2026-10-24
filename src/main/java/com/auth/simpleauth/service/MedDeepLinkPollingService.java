@@ -83,7 +83,9 @@ public class MedDeepLinkPollingService {
                     }
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            // Log do erro ao capturar atualizações para diagnóstico do '409 Conflict'
+            System.err.println(">>> Erro no Polling do Telegram: " + e.getMessage());
         }
     }
 
@@ -142,7 +144,7 @@ public class MedDeepLinkPollingService {
                         "👇 <b>TOQUE NO BOTÃO ABAIXO</b> 👇", nome);
 
         Map<String, Object> btnAbrirPainel = Map.of(
-                "text", "👉  CONTINUAR",
+                "text", "👉 CONTINUAR",
                 "web_app", Map.of("url", urlRetorno)
         );
 
@@ -172,25 +174,32 @@ public class MedDeepLinkPollingService {
 
                 var medicamento = dose.getMedicamento();
                 var idoso = medicamento != null ? medicamento.getIdoso() : null;
+                var familiar = idoso != null ? idoso.getFamiliar() : null;
+
+                String chatIdIdoso = idoso != null ? idoso.getTelegramChatId() : null;
+                String chatIdFamiliar = familiar != null ? familiar.getTelegramChatId() : null;
 
                 // 1. Notifica o Idoso
-                if (idoso != null && idoso.getTelegramChatId() != null && !idoso.getTelegramChatId().isBlank()) {
-                    System.out.println(">>> Notificando IDOSO (" + idoso.getNome() + ") no Chat ID: " + idoso.getTelegramChatId());
-                    medTelegramNotifier.enviarNotificacao(idoso.getTelegramChatId(), "🎉 Parabéns! Sua dose foi confirmada com sucesso.");
+                if (chatIdIdoso != null && !chatIdIdoso.isBlank()) {
+                    System.out.println(">>> Notificando IDOSO (" + idoso.getNome() + ") no Chat ID: " + chatIdIdoso);
+                    medTelegramNotifier.enviarNotificacao(chatIdIdoso, "🎉 Parabéns! Sua dose foi confirmada com sucesso.");
                 } else {
                     System.err.println(">>> ⚠️ AVISO: Idoso nulo ou sem Telegram Chat ID cadastrado!");
                 }
 
-                // 2. Notifica o Familiar
-                var familiar = idoso != null ? idoso.getFamiliar() : null;
-                if (familiar != null && familiar.getTelegramChatId() != null && !familiar.getTelegramChatId().isBlank()) {
-                    System.out.println(">>> Notificando FAMILIAR (" + familiar.getNome() + ") no Chat ID: " + familiar.getTelegramChatId());
-                    String msgFamiliar = String.format(
-                            "✅ O idoso %s confirmou a tomada do medicamento '%s'!",
-                            idoso.getNome(),
-                            medicamento.getNome()
-                    );
-                    medTelegramNotifier.enviarNotificacao(familiar.getTelegramChatId(), msgFamiliar);
+                // 2. Notifica o Familiar (somente se o Chat ID do Familiar for válido e DIFERENTE do Idoso)
+                if (chatIdFamiliar != null && !chatIdFamiliar.isBlank()) {
+                    if (chatIdFamiliar.equals(chatIdIdoso)) {
+                        System.err.println(">>> ⚠️ ALERTA: Chat ID do Familiar (" + chatIdFamiliar + ") é idêntico ao do Idoso! Notificação duplicada no mesmo aparelho evitada.");
+                    } else {
+                        System.out.println(">>> Notificando FAMILIAR (" + familiar.getNome() + ") no Chat ID: " + chatIdFamiliar);
+                        String msgFamiliar = String.format(
+                                "✅ O idoso %s confirmou a tomada do medicamento '%s'!",
+                                idoso.getNome(),
+                                medicamento.getNome()
+                        );
+                        medTelegramNotifier.enviarNotificacao(chatIdFamiliar, msgFamiliar);
+                    }
                 } else {
                     System.err.println(">>> ⚠️ AVISO AO FAMILIAR NÃO ENVIADO: " +
                             (familiar == null ? "Idoso sem Familiar associado!" : "Familiar '" + familiar.getNome() + "' está com telegramChatId NULO ou VAZIO no banco de dados!"));
