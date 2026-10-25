@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DoseRepository extends JpaRepository<Dose, Long> {
@@ -19,7 +20,21 @@ public interface DoseRepository extends JpaRepository<Dose, Long> {
 
     List<Dose> findByMedicamentoIdosoId(Long idosoId);
 
-    List<Dose> findByStatusInAndHorarioProgramadoLessThanEqual(List<StatusDose> status, LocalDateTime horario);
+    @Query("SELECT d FROM Dose d " +
+            "LEFT JOIN FETCH d.medicamento m " +
+            "LEFT JOIN FETCH m.idoso i " +
+            "LEFT JOIN FETCH i.familiar f " +
+            "WHERE d.status IN :status AND d.horarioProgramado <= :horario")
+    List<Dose> findByStatusInAndHorarioProgramadoLessThanEqual(
+            @Param("status") List<StatusDose> status,
+            @Param("horario") LocalDateTime horario);
+
+    @Query("SELECT d FROM Dose d " +
+            "LEFT JOIN FETCH d.medicamento m " +
+            "LEFT JOIN FETCH m.idoso i " +
+            "LEFT JOIN FETCH i.familiar f " +
+            "WHERE d.id = :id")
+    Optional<Dose> findByIdWithFullTree(@Param("id") Long id);
 
     List<Dose> findByMedicamentoIdosoIdAndStatusOrderByHorarioConfirmadoDesc(Long idosoId, StatusDose status);
 
