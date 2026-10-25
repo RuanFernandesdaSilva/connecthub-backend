@@ -31,12 +31,13 @@ public class IdosoService {
             familiar = familiarRepository.findById(dto.getIdFamiliar()).orElse(null);
         }
 
-        // 2. Fallback defensivo: se não foi informado ou não encontrou, associa ao primeiro familiar cadastrado
+        // 2. Fallback defensivo: se não foi informado ou não encontrou, associa ao último ou primeiro familiar cadastrado
         if (familiar == null) {
             List<Familiar> familiares = familiarRepository.findAll();
             if (!familiares.isEmpty()) {
-                familiar = familiares.get(0);
-                System.out.println(">>> ⚠️ [IdosoService] idFamiliar nulo ou não encontrado no DTO. Associando automaticamente ao Familiar: "
+                // Pega o último familiar cadastrado (mais recente)
+                familiar = familiares.get(familiares.size() - 1);
+                System.out.println(">>> ⚠️ [IdosoService] idFamiliar nulo ou não encontrado no DTO ao cadastrar. Associando automaticamente ao Familiar: "
                         + familiar.getNome() + " (ID: " + familiar.getId() + ")");
             }
         }
@@ -64,7 +65,7 @@ public class IdosoService {
         if (dto.getEmail() != null && !dto.getEmail().isBlank()) idosoEncontrado.setEmail(dto.getEmail());
         if (dto.getSenha() != null && !dto.getSenha().isBlank()) idosoEncontrado.setSenha(dto.getSenha());
 
-        // Atualização Idempotente: só altera o vínculo se realmente for um familiar diferente
+        // 1. Se veio idFamiliar no DTO, atualiza de forma idempotente
         if (dto.getIdFamiliar() != null) {
             boolean jaPossuiMesmoFamiliar = idosoEncontrado.getFamiliar() != null
                     && idosoEncontrado.getFamiliar().getId().equals(dto.getIdFamiliar());
@@ -73,6 +74,16 @@ public class IdosoService {
                 Familiar novoFamiliar = familiarRepository.findById(dto.getIdFamiliar())
                         .orElseThrow(() -> new RuntimeException("Familiar não encontrado com ID: " + dto.getIdFamiliar()));
                 idosoEncontrado.setFamiliar(novoFamiliar);
+            }
+        }
+        // 2. Fallback defensivo na atualização: se o idoso está sem familiar e não veio idFamiliar no DTO, associa ao familiar mais recente
+        else if (idosoEncontrado.getFamiliar() == null) {
+            List<Familiar> familiares = familiarRepository.findAll();
+            if (!familiares.isEmpty()) {
+                Familiar familiarFallback = familiares.get(familiares.size() - 1);
+                idosoEncontrado.setFamiliar(familiarFallback);
+                System.out.println(">>> ⚠️ [IdosoService] Idoso ID: " + id + " estava sem familiar. Associado automaticamente ao Familiar: "
+                        + familiarFallback.getNome() + " (ID: " + familiarFallback.getId() + ")");
             }
         }
 
