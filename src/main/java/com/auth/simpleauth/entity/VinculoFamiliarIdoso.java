@@ -34,7 +34,7 @@ public class VinculoFamiliarIdoso {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private StatusVinculo status = StatusVinculo.PENDENTE;
+    private StatusVinculo status = StatusVinculo.ACEITO;
 
     @Column(name = "data_criacao", nullable = false, updatable = false)
     private LocalDateTime dataCriacao;
@@ -47,7 +47,7 @@ public class VinculoFamiliarIdoso {
     public VinculoFamiliarIdoso(Familiar familiar, Idoso idoso) {
         this.familiar = familiar;
         this.idoso = idoso;
-        this.status = StatusVinculo.PENDENTE;
+        this.status = StatusVinculo.ACEITO;
     }
 
     public VinculoFamiliarIdoso(Familiar familiar, Idoso idoso, StatusVinculo status) {

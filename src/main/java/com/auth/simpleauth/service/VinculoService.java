@@ -1,6 +1,5 @@
 package com.auth.simpleauth.service;
 
-import com.auth.simpleauth.dto.PedidoVinculoDto;
 import com.auth.simpleauth.dto.UsuarioVinculadoDto;
 import com.auth.simpleauth.dto.VinculoDetalhadoResponseDto;
 import com.auth.simpleauth.entity.Familiar;
@@ -42,25 +41,6 @@ public class VinculoService {
     }
 
     @Transactional
-    public VinculoFamiliarIdoso solicitarVinculo(Long idFamiliar, Long idIdoso) {
-        Familiar familiar = familiarRepository.findById(idFamiliar)
-                .orElseThrow(() -> new IllegalArgumentException("Familiar não encontrado com ID: " + idFamiliar));
-
-        Idoso idoso = idosoRepository.findById(idIdoso)
-                .orElseThrow(() -> new IllegalArgumentException("Idoso não encontrado com ID: " + idIdoso));
-
-        return vinculoFamiliarRepository.findByFamiliarIdAndIdosoId(idFamiliar, idIdoso)
-                .map(vinculo -> {
-                    if (vinculo.getStatus() == StatusVinculo.ACEITO) {
-                        throw new IllegalStateException("Este vínculo já está aprovado.");
-                    }
-                    vinculo.setStatus(StatusVinculo.PENDENTE);
-                    return vinculoFamiliarRepository.save(vinculo);
-                })
-                .orElseGet(() -> vinculoFamiliarRepository.save(new VinculoFamiliarIdoso(familiar, idoso, StatusVinculo.PENDENTE)));
-    }
-
-    @Transactional
     public VinculoFamiliarIdoso vincularDiretoPorQrCode(Long idFamiliar, Long idIdoso) {
         Familiar familiar = familiarRepository.findById(idFamiliar)
                 .orElseThrow(() -> new IllegalArgumentException("Familiar não encontrado com ID: " + idFamiliar));
@@ -68,39 +48,17 @@ public class VinculoService {
         Idoso idoso = idosoRepository.findById(idIdoso)
                 .orElseThrow(() -> new IllegalArgumentException("Idoso não encontrado com ID: " + idIdoso));
 
+        // 1. Atualiza diretamente a chave estrangeira do Idoso na tabela do banco
+        idoso.setFamiliar(familiar);
+        idosoRepository.save(idoso);
+
+        // 2. Trata o registro associativo garantindo status ACEITO e evitando restrições de duplicidade
         return vinculoFamiliarRepository.findByFamiliarIdAndIdosoId(idFamiliar, idIdoso)
                 .map(vinculo -> {
                     vinculo.setStatus(StatusVinculo.ACEITO);
                     return vinculoFamiliarRepository.save(vinculo);
                 })
                 .orElseGet(() -> vinculoFamiliarRepository.save(new VinculoFamiliarIdoso(familiar, idoso, StatusVinculo.ACEITO)));
-    }
-
-    @Transactional(readOnly = true)
-    public List<PedidoVinculoDto> listarPedidosPendentesDoIdoso(Long idIdoso) {
-        List<VinculoFamiliarIdoso> pendentes = vinculoFamiliarRepository
-                .findByIdosoIdAndStatusWithFamiliar(idIdoso, StatusVinculo.PENDENTE);
-
-        return pendentes.stream().map(v -> new PedidoVinculoDto(
-                v.getId(),
-                v.getFamiliar().getId(),
-                v.getFamiliar().getNome(),
-                v.getFamiliar().getEmail(),
-                v.getFamiliar().getImagemUrl(),
-                v.getDataCriacao()
-        )).collect(Collectors.toList());
-    }
-
-    @Transactional
-    public String responderSolicitacao(Long vinculoId, boolean aceito) {
-        VinculoFamiliarIdoso vinculo = vinculoFamiliarRepository.findById(vinculoId)
-                .orElseThrow(() -> new IllegalArgumentException("Solicitação de vínculo não encontrada. ID: " + vinculoId));
-
-        StatusVinculo novoStatus = aceito ? StatusVinculo.ACEITO : StatusVinculo.RECUSADO;
-        vinculo.setStatus(novoStatus);
-        vinculoFamiliarRepository.save(vinculo);
-
-        return aceito ? "Solicitação aceita com sucesso!" : "Solicitação recusada.";
     }
 
     @Transactional(readOnly = true)
