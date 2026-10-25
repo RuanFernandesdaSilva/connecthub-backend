@@ -91,7 +91,7 @@ public class MedDeepLinkPollingService {
     }
 
     @Transactional
-    private void processarComandoStart(String texto, String chatId) {
+    public void processarComandoStart(String texto, String chatId) {
         if (texto.startsWith("/start")) {
             String[] partes = texto.split(" ");
             if (partes.length > 1) {
@@ -164,28 +164,34 @@ public class MedDeepLinkPollingService {
     }
 
     @Transactional
-    private void processarConfirmacao(String callbackQueryId, Long idDose) {
+    public void processarConfirmacao(String callbackQueryId, Long idDose) {
         responderCallback(callbackQueryId, "✅ Remédio registrado com sucesso!");
 
         doseRepository.findById(idDose).ifPresent(dose -> {
             System.out.println(">>> [CONFIRMAÇÃO DOSE] Processando Dose ID: " + idDose + " | Status atual: " + dose.getStatus());
 
             if (dose.getStatus() != StatusDose.TOMADO) {
+
+                // 1. Guarda a referência do ID do Idoso e do Medicamento ANTES da alteração de status
+                var medicamento = dose.getMedicamento();
+                Long idosoId = (medicamento != null && medicamento.getIdoso() != null) ? medicamento.getIdoso().getId() : null;
+                String nomeMedicamento = medicamento != null ? medicamento.getNome() : "";
+
+                // 2. Executa a confirmação da dose
                 doseService.confirmarDose(idDose);
 
-                var medicamento = dose.getMedicamento();
-                var idoso = medicamento != null ? medicamento.getIdoso() : null;
-
-                // ✅ CORREÇÃO CRUCIAL: Busca o Familiar atualizado direto do banco de dados (ignorando cache)
-                Familiar familiar = null;
-                if (idoso != null && idoso.getFamiliar() != null) {
-                    familiar = familiarRepository.findById(idoso.getFamiliar().getId()).orElse(null);
+                // 3. Busca o Idoso diretamente do repositório carregando explicitamente o Familiar via JOIN FETCH
+                com.auth.simpleauth.entity.Idoso idoso = null;
+                if (idosoId != null) {
+                    idoso = idosoRepository.findByIdWithFamiliar(idosoId).orElse(null);
                 }
+
+                Familiar familiar = idoso != null ? idoso.getFamiliar() : null;
 
                 String chatIdIdoso = idoso != null ? idoso.getTelegramChatId() : null;
                 String chatIdFamiliar = familiar != null ? familiar.getTelegramChatId() : null;
 
-                // 1. Notifica o Idoso
+                // 4. Notifica o Idoso
                 if (chatIdIdoso != null && !chatIdIdoso.isBlank()) {
                     System.out.println(">>> Notificando IDOSO (" + idoso.getNome() + ") no Chat ID: " + chatIdIdoso);
                     medTelegramNotifier.enviarNotificacao(chatIdIdoso, "🎉 Parabéns! Sua dose foi confirmada com sucesso.");
@@ -193,7 +199,7 @@ public class MedDeepLinkPollingService {
                     System.err.println(">>> ⚠️ AVISO: Idoso nulo ou sem Telegram Chat ID cadastrado!");
                 }
 
-                // 2. Notifica o Familiar
+                // 5. Notifica o Familiar
                 if (chatIdFamiliar != null && !chatIdFamiliar.isBlank()) {
                     if (chatIdFamiliar.equals(chatIdIdoso)) {
                         System.err.println(">>> ⚠️ ALERTA: Chat ID do Familiar (" + chatIdFamiliar + ") é idêntico ao do Idoso! Notificação duplicada evitada.");
@@ -202,13 +208,13 @@ public class MedDeepLinkPollingService {
                         String msgFamiliar = String.format(
                                 "✅ O idoso %s confirmou a tomada do medicamento '%s'!",
                                 idoso.getNome(),
-                                medicamento.getNome()
+                                nomeMedicamento
                         );
                         medTelegramNotifier.enviarNotificacao(chatIdFamiliar, msgFamiliar);
                     }
                 } else {
                     System.err.println(">>> ⚠️ AVISO AO FAMILIAR NÃO ENVIADO: " +
-                            (familiar == null ? "Idoso sem Familiar associado!" : "Familiar '" + familiar.getNome() + "' está com telegramChatId NULO ou VAZIO no banco de dados!"));
+                            (familiar == null ? "Idoso sem Familiar associado no banco de dados!" : "Familiar '" + familiar.getNome() + "' está com telegramChatId NULO ou VAZIO no banco de dados!"));
                 }
             }
         });

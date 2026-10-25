@@ -173,14 +173,21 @@ public class MedicamentoSchedulerService {
     }
 
     private void notificarFamiliarTerminoTratamento(Medicamento med) {
-        Familiar familiar = med.getIdoso() != null ? med.getIdoso().getFamiliar() : null;
+        var idoso = med.getIdoso();
+
+        // ✅ CORREÇÃO CRUCIAL: Busca o Familiar atualizado direto do repositório
+        Familiar familiar = null;
+        if (idoso != null && idoso.getFamiliar() != null) {
+            familiar = familiarRepository.findById(idoso.getFamiliar().getId()).orElse(null);
+        }
+
         if (familiar != null && familiar.getTelegramChatId() != null && !familiar.getTelegramChatId().isBlank()) {
             String msgFamiliar = String.format(
                     "📋 <b>TRATAMENTO CONCLUÍDO</b>\n\n" +
                             "O tratamento do medicamento <b>%s</b> para o idoso <b>%s</b> atingiu a data de término prevista (%s).\n\n" +
                             "ℹ️ O medicamento foi inativado automaticamente e não gerará novos lembretes.",
                     med.getNome(),
-                    med.getIdoso().getNome(),
+                    idoso.getNome(),
                     med.getDataFimTratamento().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
             );
             medTelegramNotifier.enviarNotificacao(familiar.getTelegramChatId(), msgFamiliar);
