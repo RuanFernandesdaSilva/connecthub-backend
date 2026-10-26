@@ -15,8 +15,8 @@ public class AdminVinculoController {
     }
 
     /**
-     * Endpoint genérico para vincular qualquer idoso a um familiar.
-     * Exemplo de uso: GET /api/admin/vinculos/vincular?idosoId=1&familiarId=2
+     * Endpoint genérico para vincular qualquer idoso a um familiar via URL.
+     * Exemplo de uso: GET /api/admin/vinculos/vincular?idosoId=36&familiarId=37
      */
     @GetMapping("/vincular")
     public ResponseEntity<String> vincularIdosoAFamiliar(
@@ -28,9 +28,10 @@ public class AdminVinculoController {
 
     /**
      * Endpoint automático que corrige no banco qualquer idoso orfão com vínculo aceito.
-     * Exemplo de uso: POST /api/admin/vinculos/sincronizar
+     * Alterado para GET para permitir execução direta via navegador.
+     * Exemplo de uso: GET /api/admin/vinculos/sincronizar
      */
-    @PostMapping("/sincronizar")
+    @GetMapping("/sincronizar")
     public ResponseEntity<String> sincronizarVinculos() {
         String resultado = adminVinculoService.sincronizarTodosVinculosOrfaos();
         return ResponseEntity.ok(resultado);
