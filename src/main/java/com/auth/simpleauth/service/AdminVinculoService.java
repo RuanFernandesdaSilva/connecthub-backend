@@ -3,7 +3,6 @@ package com.auth.simpleauth.service;
 import com.auth.simpleauth.entity.Familiar;
 import com.auth.simpleauth.entity.Idoso;
 import com.auth.simpleauth.entity.VinculoFamiliarIdoso;
-import com.auth.simpleauth.enums.StatusVinculo;
 import com.auth.simpleauth.repository.FamiliarRepository;
 import com.auth.simpleauth.repository.IdosoRepository;
 import com.auth.simpleauth.repository.VinculoFamiliarRepository;
@@ -55,7 +54,7 @@ public class AdminVinculoService {
 
     /**
      * Sincroniza e vincula automaticamente TODOS os idosos sem familiar
-     * buscando seus vínculos aceitos via Repositório JPA.
+     * utilizando os relacionamentos da tabela de vínculos.
      */
     @Transactional
     public String sincronizarTodosVinculosOrfaos() {
@@ -64,17 +63,21 @@ public class AdminVinculoService {
             int contagem = 0;
 
             for (VinculoFamiliarIdoso v : vinculos) {
-                Idoso idoso = v.getIdoso();
-                if (idoso != null && idoso.getFamiliar() == null) {
-                    idoso.setFamiliar(v.getFamiliar());
-                    idosoRepository.save(idoso);
-                    contagem++;
+                if (v.getIdoso() != null && v.getFamiliar() != null) {
+                    // Carrega explicitamente o idoso para evitar inconsistências de proxy Lazy
+                    Idoso idoso = idosoRepository.findById(v.getIdoso().getId()).orElse(null);
+                    if (idoso != null && idoso.getFamiliar() == null) {
+                        idoso.setFamiliar(v.getFamiliar());
+                        idosoRepository.save(idoso);
+                        contagem++;
+                    }
                 }
             }
 
-            return String.format("🔄 Sincronização concluída! %d idoso(s) sem familiar foram vinculados automaticamente via JPA.", contagem);
+            return String.format("🔄 Sincronização concluída com sucesso! %d idoso(s) vinculados ao(s) seu(s) familiar(es).", contagem);
         } catch (Exception e) {
-            return "❌ Erro na sincronização: " + e.getMessage();
+            e.printStackTrace();
+            return "❌ Erro na sincronização: " + e.getClass().getSimpleName() + " - " + e.getMessage();
         }
     }
 }
