@@ -1,16 +1,30 @@
 package com.auth.simpleauth.service;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.auth.simpleauth.entity.Familiar;
+import com.auth.simpleauth.entity.Idoso;
+import com.auth.simpleauth.entity.VinculoFamiliarIdoso;
+import com.auth.simpleauth.enums.StatusVinculo;
+import com.auth.simpleauth.repository.FamiliarRepository;
+import com.auth.simpleauth.repository.IdosoRepository;
+import com.auth.simpleauth.repository.VinculoFamiliarRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 public class AdminVinculoService {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final IdosoRepository idosoRepository;
+    private final FamiliarRepository familiarRepository;
+    private final VinculoFamiliarRepository vinculoFamiliarRepository;
 
-    public AdminVinculoService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public AdminVinculoService(IdosoRepository idosoRepository,
+                               FamiliarRepository familiarRepository,
+                               VinculoFamiliarRepository vinculoFamiliarRepository) {
+        this.idosoRepository = idosoRepository;
+        this.familiarRepository = familiarRepository;
+        this.vinculoFamiliarRepository = vinculoFamiliarRepository;
     }
 
     /**
@@ -19,49 +33,46 @@ public class AdminVinculoService {
     @Transactional
     public String vincularManualmente(Long idosoId, Long familiarId) {
         try {
-            int linhasIdoso = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM idoso WHERE id = ?", Integer.class, idosoId);
-            int linhasFamiliar = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM familiar WHERE id = ?", Integer.class, familiarId);
-
-            if (linhasIdoso == 0) {
+            Idoso idoso = idosoRepository.findById(idosoId).orElse(null);
+            if (idoso == null) {
                 return "❌ Idoso com ID " + idosoId + " não encontrado.";
             }
-            if (linhasFamiliar == 0) {
+
+            Familiar familiar = familiarRepository.findById(familiarId).orElse(null);
+            if (familiar == null) {
                 return "❌ Familiar com ID " + familiarId + " não encontrado.";
             }
 
-            jdbcTemplate.update("UPDATE idoso SET familiar_id = ? WHERE id = ?", familiarId, idosoId);
-            return String.format("✅ SUCESSO: Idoso (ID %d) foi vinculado ao Familiar (ID %d)!", idosoId, familiarId);
+            idoso.setFamiliar(familiar);
+            idosoRepository.save(idoso);
+
+            return String.format("✅ SUCESSO: Idoso %s (ID %d) foi vinculado ao Familiar %s (ID %d)!",
+                    idoso.getNome(), idosoId, familiar.getNome(), familiarId);
         } catch (Exception e) {
             return "❌ Erro ao vincular manualmente: " + e.getMessage();
         }
     }
 
     /**
-     * Sincroniza e vincula automaticamente TODOS os idosos que estão sem familiar_id,
-     * utilizando os relacionamentos da tabela associativa.
+     * Sincroniza e vincula automaticamente TODOS os idosos sem familiar
+     * buscando seus vínculos aceitos via Repositório JPA.
      */
     @Transactional
     public String sincronizarTodosVinculosOrfaos() {
         try {
-            // SQL seguro para PostgreSQL utilizando subquery para evitar erros de sintaxe JOIN/UPDATE
-            String sqlQuery =
-                    "UPDATE idoso " +
-                            "SET familiar_id = (" +
-                            "    SELECT v.familiar_id " +
-                            "    FROM tbl_vinculo_familiar_idoso v " +
-                            "    WHERE v.idoso_id = idoso.id " +
-                            "    ORDER BY v.id DESC LIMIT 1" +
-                            ") " +
-                            "WHERE familiar_id IS NULL " +
-                            "  AND EXISTS (" +
-                            "    SELECT 1 FROM tbl_vinculo_familiar_idoso v WHERE v.idoso_id = idoso.id" +
-                            ")";
+            List<VinculoFamiliarIdoso> vinculos = vinculoFamiliarRepository.findAll();
+            int contagem = 0;
 
-            int atualizados = jdbcTemplate.update(sqlQuery);
+            for (VinculoFamiliarIdoso v : vinculos) {
+                Idoso idoso = v.getIdoso();
+                if (idoso != null && idoso.getFamiliar() == null) {
+                    idoso.setFamiliar(v.getFamiliar());
+                    idosoRepository.save(idoso);
+                    contagem++;
+                }
+            }
 
-            return String.format("🔄 Sincronização concluída! %d idoso(s) sem familiar foram vinculados automaticamente.", atualizados);
+            return String.format("🔄 Sincronização concluída! %d idoso(s) sem familiar foram vinculados automaticamente via JPA.", contagem);
         } catch (Exception e) {
             return "❌ Erro na sincronização: " + e.getMessage();
         }
