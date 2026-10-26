@@ -10,7 +10,8 @@ import java.time.ZoneId;
 @Component
 public class TestableClock extends Clock {
 
-    private Clock baseClock = Clock.systemDefaultZone();
+    private static final ZoneId FUSO_BRASILIA = ZoneId.of("America/Sao_Paulo");
+    private Clock baseClock = Clock.system(FUSO_BRASILIA);
 
     @Override
     public ZoneId getZone() {
@@ -27,18 +28,15 @@ public class TestableClock extends Clock {
         return baseClock.instant();
     }
 
-
     public void adiantarHoras(long horas) {
         this.baseClock = Clock.offset(this.baseClock, Duration.ofHours(horas));
     }
-
 
     public void adiantarMinutos(long minutos) {
         this.baseClock = Clock.offset(this.baseClock, Duration.ofMinutes(minutos));
     }
 
-
     public void resetar() {
-        this.baseClock = Clock.systemDefaultZone();
+        this.baseClock = Clock.system(FUSO_BRASILIA);
     }
 }

@@ -13,24 +13,42 @@ public class TestTimeController {
     @Autowired
     private TestableClock clock;
 
+    /**
+     * Exibe o horário atual simulado pela aplicação.
+     * Uso: GET /teste/tempo/agora
+     */
+    @GetMapping("/agora")
+    public String obterHorarioAtual() {
+        return "🕒 Horário atual da aplicação: " + LocalDateTime.now(clock);
+    }
 
-    @PostMapping("/avancar-horas/{horas}")
+    /**
+     * Avança X horas no relógio.
+     * Uso: GET /teste/tempo/avancar-horas/2
+     */
+    @GetMapping("/avancar-horas/{horas}")
     public String avancarHoras(@PathVariable long horas) {
         clock.adiantarHoras(horas);
-        return "Tempo adiantado em " + horas + " horas! Horário atual da aplicação: " + LocalDateTime.now(clock);
+        return "⏩ Tempo adiantado em " + horas + " hora(s)! Horário atual da aplicação: " + LocalDateTime.now(clock);
     }
 
-
-    @PostMapping("/avancar-minutos/{minutos}")
+    /**
+     * Avança X minutos no relógio.
+     * Uso: GET /teste/tempo/avancar-minutos/15
+     */
+    @GetMapping("/avancar-minutos/{minutos}")
     public String avancarMinutos(@PathVariable long minutos) {
         clock.adiantarMinutos(minutos);
-        return "Tempo adiantado em " + minutos + " minutos! Horário atual da aplicação: " + LocalDateTime.now(clock);
+        return "⏩ Tempo adiantado em " + minutos + " minuto(s)! Horário atual da aplicação: " + LocalDateTime.now(clock);
     }
 
-
-    @PostMapping("/resetar")
+    /**
+     * Reseta o relógio para o horário real oficial.
+     * Uso: GET /teste/tempo/resetar
+     */
+    @GetMapping("/resetar")
     public String resetar() {
         clock.resetar();
-        return "Relógio resetado para o horário real: " + LocalDateTime.now(clock);
+        return "🔄 Relógio resetado para o horário real: " + LocalDateTime.now(clock);
     }
 }
